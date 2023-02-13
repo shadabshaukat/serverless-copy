@@ -54,7 +54,7 @@ def lambda_handler(event, context):
                     'KeyType': 'HASH'
                 }
             ],
-            AttributeDefinitions=[{'AttributeName': 'file_name','AttributeType': 'S'},{'AttributeName': 'file_path_in_aws_bucket','AttributeType': 'S'},{'AttributeName': 'timestamp','AttributeType': 'S'},{'AttributeName': 'status', 'AttributeType': 'S' } ],
+            AttributeDefinitions=[{'AttributeName': 'file_name','AttributeType': 'S'}],
             ProvisionedThroughput={
                 'ReadCapacityUnits': 5,
                 'WriteCapacityUnits': 5
@@ -80,11 +80,15 @@ def lambda_handler(event, context):
         except Exception as e:
             # Publish the error to the SNS topic
             sns = boto3.client('sns')
-            sns.publish(TopicArn=sns_topic_arn, Message='Error copying file : ' + file['Key'] + ' to Bucket : ' + oracle_bucket)
+            error_message = f'Error copying file: {file["Key"]} to OCI Bucket: {oracle_bucket}. Error: {str(e)}'
+            sns.publish(TopicArn=sns_topic_arn, Message=error_message)
             # Add the copied file information to the DynamoDB table
             dynamodb.put_item(TableName=dynamodb_table_name, Item={
                 'file_name': {'S': os.path.basename(file['Key'])},
                 'file_path_in_aws_bucket': {'S': file['Key']},
                 'timestamp': {'S': str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))},
-                'status': {'S': 'failure'}
+                'status': {'S': 'failure'},
+                'error': {'S': str(e)}
             })
+        
+        
