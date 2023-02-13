@@ -1,2 +1,2 @@
 # serverless-copy
-An AWS Lambda Function in Python to copy files to another Cloud using a Serverless approach
+AWS Lambda Function to copy files from S3 to Oracle Cloud Infrastructure Bucket using a Serverless method
