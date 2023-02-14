@@ -54,13 +54,18 @@ def lambda_handler(event, context):
                     'KeyType': 'HASH'
                 }
             ],
-            AttributeDefinitions=[{'AttributeName': 'file_name','AttributeType': 'S'}],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'file_name',
+                    'AttributeType': 'S'
+                }
+            ],
             ProvisionedThroughput={
                 'ReadCapacityUnits': 5,
                 'WriteCapacityUnits': 5
             }
         )
-    
+
     # Copy each file with the desired file extension to the OCI bucket
     for file in filtered_files:
         try:
@@ -70,25 +75,10 @@ def lambda_handler(event, context):
             folder_structure = os.path.dirname(file['Key'])
             oci_key = folder_structure + '/' + os.path.basename(file['Key'])
             s3_oci.put_object(Bucket=oracle_bucket, Key=oci_key, Body=data)
-            # Add the copied file information to the DynamoDB table
-            dynamodb.put_item(TableName=dynamodb_table_name, Item={
-                'file_name': {'S': os.path.basename(file['Key'])},
-                'file_path_in_aws_bucket': {'S': file['Key']},
-                'timestamp': {'S': str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))},
-                'status': {'S': 'success'}
-            })
+            #s3_oci.put_object(Bucket=oracle_bucket, Key=os.path.basename(file['Key']), Body=data)
+            # Add the copied file to the DynamoDB table
+            dynamodb.put_item(TableName=dynamodb_table_name, Item={'file_name': {'S': os.path.basename(file['Key'])}})
         except Exception as e:
             # Publish the error to the SNS topic
             sns = boto3.client('sns')
-            error_message = f'Error copying file: {file["Key"]} to OCI Bucket: {oracle_bucket}. Error: {str(e)}'
-            sns.publish(TopicArn=sns_topic_arn, Message=error_message)
-            # Add the copied file information to the DynamoDB table
-            dynamodb.put_item(TableName=dynamodb_table_name, Item={
-                'file_name': {'S': os.path.basename(file['Key'])},
-                'file_path_in_aws_bucket': {'S': file['Key']},
-                'timestamp': {'S': str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))},
-                'status': {'S': 'failure'},
-                'error': {'S': str(e)}
-            })
-        
-        
+            sns.publish(TopicArn=sns_topic_arn, Message='Error copying file : ' + file['Key'] + ' to Bucket : ' + oracle_bucket)
